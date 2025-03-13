@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Parkplatz Reservierung</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+
+        header {
+            background-color: #333;
+            color: white;
+            padding: 10px;
+            text-align: center;
+        }
+
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin: 20px;
+        }
+
+        .parkplatz {
+            width: 200px;
+            height: 180px;
+            margin: 10px;
+            text-align: center;
+            border: 2px solid #ccc;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+            position: relative;
+        }
+
+        .parkplatz:hover {
+            transform: scale(1.05);
+        }
+
+        .frei {
+            background-color: #8BC34A;
+        }
+
+        .reserviert {
+            background-color: #FF9800;
+        }
+
+        .beschriftung {
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .details {
+            font-size: 14px;
+        }
+
+        .time-left {
+            font-size: 12px;
+            color: #555;
+        }
+
+        .reservieren-btn {
+            background-color: #4CAF50;
+            color: white;
+            padding: 5px;
+            margin-top: 5px;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 12px;
+        }
+
+        .reservieren-btn:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Parkplatz Reservierung</h1>
+        <div id="current-time"></div>
+    </header>
+
+    <div class="container">
+        <script>
+            let parkplaetze = [
+                "Büro Parkplatz 1", "Büro Parkplatz 2", "Büro Parkplatz 3", "Büro Parkplatz 4",
+                "Parkhaus Platz 1", "Parkhaus Platz 2", "Parkhaus Platz 3", "Parkhaus Platz 4"
+            ];
+
+            parkplaetze.forEach((name, index) => {
+                document.write(`
+                    <div class="parkplatz frei" id="parkplatz${index}">
+                        <div class="beschriftung">${name}</div>
+                        <div class="details">Frei</div>
+                        <div class="time-left" id="time-left-parkplatz${index}">Verfügbar</div>
+                        <button class="reservieren-btn" onclick="reservieren('parkplatz${index}', '${name}')">Reservieren</button>
+                    </div>
+                `);
+            });
+        </script>
+    </div>
+
+    <script>
+        function loadReservations() {
+            const savedReservations = localStorage.getItem("reservations");
+            return savedReservations ? JSON.parse(savedReservations) : [];
+        }
+
+        function saveReservations() {
+            localStorage.setItem("reservations", JSON.stringify(reservations));
+        }
+
+        let reservations = loadReservations();
+
+        function reservieren(parkplatzId, name) {
+            let benutzer = prompt("Geben Sie Ihren Namen ein:");
+            if (!benutzer) return;
+
+            let startTime = prompt("Startzeit (HH:MM):");
+            let endTime = prompt("Endzeit (HH:MM):");
+            if (!startTime || !endTime) return;
+
+            let startTimestamp = new Date();
+            let [startHours, startMinutes] = startTime.split(":").map(Number);
+            startTimestamp.setHours(startHours, startMinutes, 0, 0);
+
+            let endTimestamp = new Date();
+            let [endHours, endMinutes] = endTime.split(":").map(Number);
+            endTimestamp.setHours(endHours, endMinutes, 0, 0);
+
+            reservations.push({
+                parkplatzId: parkplatzId,
+                name: benutzer,
+                startTime: startTime,
+                endTime: endTime,
+                startTimestamp: startTimestamp.getTime(),
+                endTimestamp: endTimestamp.getTime()
+            });
+
+            saveReservations();
+            checkReservations();
+        }
+
+        function checkReservations() {
+            let currentTimestamp = new Date().getTime();
+
+            document.querySelectorAll('.parkplatz').forEach(parkplatz => {
+                let parkplatzId = parkplatz.id;
+                let reservierung = reservations.find(res => res.parkplatzId === parkplatzId);
+
+                if (reservierung) {
+                    if (reservierung.startTimestamp > currentTimestamp) {
+                        // Noch nicht gestartet, bleibt frei
+                        parkplatz.classList.remove("reserviert");
+                        parkplatz.classList.add("frei");
+                        parkplatz.querySelector(".details").innerText = "Reservierung beginnt um " + reservierung.startTime;
+                        parkplatz.querySelector(".time-left").innerText = "Reserviert für " + reservierung.name;
+                    } else if (reservierung.endTimestamp > currentTimestamp) {
+                        // Reservierung aktiv
+                        parkplatz.classList.remove("frei");
+                        parkplatz.classList.add("reserviert");
+                        parkplatz.querySelector(".details").innerText = "Reserviert von " + reservierung.name;
+                        parkplatz.querySelector(".time-left").innerText = "Bis " + reservierung.endTime;
+                    } else {
+                        // Reservierung abgelaufen, Parkplatz wieder freigeben
+                        parkplatz.classList.remove("reserviert");
+                        parkplatz.classList.add("frei");
+                        parkplatz.querySelector(".details").innerText = "Frei";
+                        parkplatz.querySelector(".time-left").innerText = "Verfügbar";
+
+                        reservations = reservations.filter(res => res.parkplatzId !== parkplatzId);
+                    }
+                }
+            });
+
+            saveReservations();
+        }
+
+        function updateTime() {
+            const currentTime = new Date().toLocaleString('de-DE', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'numeric',
+                day: 'numeric',
+                hour: 'numeric',
+                minute: 'numeric',
+                second: 'numeric',
+            });
+            document.getElementById('current-time').innerText = currentTime;
+        }
+
+        setInterval(() => {
+            checkReservations();
+            updateTime();
+        }, 30000);
+
+        window.onload = function () {
+            checkReservations();
+            updateTime();
+        };
+    </script>
+
+</body>
+</html>
